@@ -181,6 +181,41 @@ footer{max-width:680px;margin:0 auto;padding:22px 18px 34px;border-top:1px solid
   padding:11px 20px;border-radius:980px;font-size:.92rem;pointer-events:none;white-space:nowrap
 }
 .toast.show{opacity:1;transform:translate(-50%,0)}
+/* ================= APPLE-STYLE POINTER + CLICK ================= */
+html.has-cursor,html.has-cursor *{cursor:none!important}
+.cursor{
+  position:fixed;left:0;top:0;z-index:50;pointer-events:none;
+  width:20px;height:20px;border-radius:10px;opacity:0;
+  background:rgba(0,0,0,.24);
+  transition:opacity .3s,background-color .3s,scale .18s var(--spring);
+  will-change:transform,width,height;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .cursor{background:rgba(255,255,255,.34)}}
+:root[data-theme="dark"] .cursor{background:rgba(255,255,255,.34)}
+.cursor.on{opacity:1}
+.cursor.big{background:rgba(120,120,128,.16)}
+.cursor.snap{background:rgba(0,113,227,.13)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .cursor.snap{background:rgba(41,151,255,.2)}}
+:root[data-theme="dark"] .cursor.snap{background:rgba(41,151,255,.2)}
+.cursor.down{scale:.82}
+.click-ring{
+  position:fixed;width:60px;height:60px;margin:-30px 0 0 -30px;border-radius:50%;
+  border:2px solid var(--btn);pointer-events:none;z-index:49;
+  animation:ring .65s var(--ease) forwards;
+}
+.click-dot{
+  position:fixed;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;
+  background:var(--btn);pointer-events:none;z-index:49;animation:dot .45s var(--ease) forwards;
+}
+@keyframes ring{from{transform:scale(.15);opacity:.75}to{transform:scale(1);opacity:0}}
+@keyframes dot{from{transform:scale(1);opacity:.6}to{transform:scale(2.4);opacity:0}}
+.tile{position:relative;overflow:hidden}
+.tile::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .4s;
+  background:radial-gradient(280px circle at var(--sx,50%) var(--sy,50%),rgba(0,113,227,.09),transparent 60%);
+}
+.has-cursor .tile:hover::after{opacity:1}
+.magnet{transition:translate .35s var(--spring)}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important}
@@ -378,6 +413,71 @@ if (!reduce) {
     el.addEventListener("keyup", up);
     el.addEventListener("blur", up);
   });
+}
+
+/* ---------- Apple-style pointer + click ---------- */
+if (!reduce) {
+  // click / tap ring — works with mouse and finger
+  addEventListener("pointerdown", e => {
+    ["click-ring","click-dot"].forEach(cls => {
+      const r = document.createElement("span");
+      r.className = cls; r.style.left = e.clientX + "px"; r.style.top = e.clientY + "px";
+      document.body.appendChild(r); setTimeout(() => r.remove(), 700);
+    });
+  }, {passive:true});
+}
+if (!reduce && matchMedia("(hover:hover) and (pointer:fine)").matches) {
+  document.documentElement.classList.add("has-cursor");
+  const c = document.createElement("div"); c.className = "cursor"; c.setAttribute("aria-hidden","true");
+  document.body.appendChild(c);
+  const SNAP = ".pill, .more, .chips a, .stars a, .row";
+  let mx = -100, my = -100, x = mx, y = my, w = 20, h = 20, rad = 10, target = null, seen = false;
+  addEventListener("pointermove", e => {
+    mx = e.clientX; my = e.clientY;
+    if (!seen) { seen = true; x = mx - 10; y = my - 10; }
+    c.classList.add("on");
+  }, {passive:true});
+  document.addEventListener("pointerout", e => { if (!e.relatedTarget) c.classList.remove("on"); });
+  document.addEventListener("pointerover", e => {
+    const s = e.target.closest(SNAP);
+    if (target && target !== s) { target.style.translate = ""; target._dx = target._dy = 0; }
+    target = s;
+    if (s) s.classList.add("magnet");
+    c.classList.toggle("snap", !!s);
+    c.classList.toggle("big", !s && !!e.target.closest(".tile"));
+  });
+  addEventListener("pointerdown", () => c.classList.add("down"));
+  addEventListener("pointerup", () => c.classList.remove("down"));
+  const loop = () => {
+    let tx, ty, tw, th, tr;
+    if (target) {
+      const r = target.getBoundingClientRect();
+      const L = r.left - (target._dx || 0), T = r.top - (target._dy || 0);   // rect without the magnet shift
+      const dx = (mx - (L + r.width / 2)) / r.width, dy = (my - (T + r.height / 2)) / r.height;
+      target._dx = dx * 6; target._dy = dy * 4;
+      target.style.translate = `${target._dx}px ${target._dy}px`;
+      const pad = 6;
+      tw = r.width + pad * 2; th = r.height + pad * 2;
+      tx = L - pad + dx * 10; ty = T - pad + dy * 6;
+      tr = Math.max(12, (parseFloat(getComputedStyle(target).borderTopLeftRadius) || 0) + pad);
+      tr = Math.min(tr, th / 2);
+    } else {
+      const s = c.classList.contains("big") ? 40 : 20;
+      tw = th = s; tx = mx - s / 2; ty = my - s / 2; tr = s / 2;
+    }
+    const k = target ? .22 : .32;
+    x += (tx - x) * k; y += (ty - y) * k; w += (tw - w) * k; h += (th - h) * k; rad += (tr - rad) * k;
+    c.style.transform = `translate(${x}px,${y}px)`;
+    c.style.width = w + "px"; c.style.height = h + "px"; c.style.borderRadius = rad + "px";
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+  // soft spotlight that follows the pointer inside each tile
+  document.querySelectorAll(".tile").forEach(t => t.addEventListener("pointermove", e => {
+    const r = t.getBoundingClientRect();
+    t.style.setProperty("--sx", (e.clientX - r.left) + "px");
+    t.style.setProperty("--sy", (e.clientY - r.top) + "px");
+  }));
 }
 
 /* ---------- Save contact (vCard) ---------- */
