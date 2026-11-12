@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR maker – digital visiting card</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{--bg:#ECEEF6;--paper:#fff;--ink:#1E2333;--soft:#5B6178;--indigo:#2B3990;--line:#D8DBE8;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#11142A;--paper:#1B2042;--ink:#E9EBF6;--soft:#A5AAC4;--indigo:#9AA6FF;--line:#2E3463;color-scheme:dark}}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,sans-serif;padding:24px 16px}
+main{max-width:440px;margin:0 auto}
+h1{font-size:1.3rem;margin-bottom:6px}
+p{color:var(--soft)}
+input{width:100%;padding:14px;border-radius:12px;border:1.5px solid var(--line);font-size:1rem;margin:16px 0 10px;background:var(--paper);color:var(--ink)}
+button{width:100%;min-height:52px;border:0;border-radius:12px;background:var(--indigo);color:#fff;font-size:1rem;font-weight:600;cursor:pointer}
+@media (prefers-color-scheme:dark){button{color:#11142A}}
+canvas{width:100%;height:auto;margin-top:20px;border-radius:8px;display:block}
+#dl{margin-top:10px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <h1>Make the QR for the card</h1>
+  <p>Paste the live link of the digital card (after you upload it to Vercel), then download the QR image for printing.</p>
+  <input id="url" type="url" placeholder="https://shimal-card.vercel.app" autocomplete="off">
+  <button id="make" type="button">Make QR</button>
+  <canvas id="out" width="900" height="1100" hidden></canvas>
+  <button id="dl" type="button" hidden>Download QR image</button>
+  <div id="tmp" hidden></div>
+</main>
+<script>
+const NAME = "MD. Shimal Badsha";
+const LINE2 = "Bandhan Bank, Gakulnagar";
+const CTA = "Scan to call, WhatsApp & save my number";
+
+const make = () => {
+  const url = document.getElementById("url").value.trim();
+  if (!/^https?:\/\//.test(url)) { alert("Paste a full link starting with https://"); return; }
+  const tmp = document.getElementById("tmp"); tmp.innerHTML = "";
+  new QRCode(tmp, {text:url, width:700, height:700, colorDark:"#1E2333", colorLight:"#ffffff", correctLevel:QRCode.CorrectLevel.H});
+  setTimeout(() => {
+    const q = tmp.querySelector("canvas");
+    const c = document.getElementById("out"), x = c.getContext("2d");
+    x.fillStyle = "#fff"; x.fillRect(0,0,900,1100);
+    x.fillStyle = "#B83A33"; x.fillRect(0,0,900,14);
+    x.drawImage(q, 100, 90, 700, 700);
+    x.textAlign = "center";
+    x.fillStyle = "#B83A33"; x.font = "700 52px system-ui, sans-serif"; x.fillText(NAME, 450, 870);
+    x.fillStyle = "#2B3990"; x.font = "500 36px system-ui, sans-serif"; x.fillText(LINE2, 450, 925);
+    x.fillStyle = "#5B6178"; x.font = "400 32px system-ui, sans-serif"; x.fillText(CTA, 450, 1010);
+    c.hidden = false; document.getElementById("dl").hidden = false;
+  }, 120);
+};
+document.getElementById("make").onclick = make;
+document.getElementById("dl").onclick = () => {
+  const a = document.createElement("a");
+  a.href = document.getElementById("out").toDataURL("image/png");
+  a.download = "shimal-badsha-qr.png"; a.click();
+};
+</script>
+</body>
+</html>
